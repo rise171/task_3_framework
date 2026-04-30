@@ -6,7 +6,13 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import time
 from config import AppConfig
+# DI
+from di import Container, Lifetime, reset_scope
+from services import CounterService
 
+container = Container()
+
+container.register(CounterService, CounterService, lifetime=Lifetime.SINGLETON)
 # Чтение настроек (ранняя проверка)
 config = AppConfig.load("config.yaml")
 
@@ -47,6 +53,12 @@ async def verbose_logging(request: Request, call_next):
         return response
     return await call_next(request)
 
+@app.middleware("http")
+async def di_scope_middleware(request: Request, call_next):
+    reset_scope()
+    response = await call_next(request)
+    return response
+
 # Маршрут списка (общий лимит)
 @app.get("/items")
 @limiter.limit(f"{config.rate_limit_per_minute}/minute")
@@ -62,6 +74,17 @@ async def create_item(request: Request, name: str):
     if config.debug_verbose:
         print(f"[CREATE] {name} from {request.client.host}")
     return {"created": name, "status": "ok"}
+
+@app.get("/di-test")
+async def di_test():
+    s1 = container.resolve(CounterService)
+    s2 = container.resolve(CounterService)
+
+    return {
+        "same_instance": s1 is s2,
+        "id": s1.id,
+        "counter": s1.increment()
+    }
 
 # Для проверки ограничений
 @app.get("/")

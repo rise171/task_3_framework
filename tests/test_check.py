@@ -27,7 +27,7 @@ def test_rate_limit():
         r = requests.post(f"{BASE}/items?name=test")
         print(r.status_code)
         if r.status_code == 429:
-            print("✅ Rate limit exceeded works")
+            print(" Rate limit exceeded works")
             break
 
 def test_security_headers():
