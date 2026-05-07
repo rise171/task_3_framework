@@ -18,6 +18,9 @@ class AppConfig:
     rate_limit_create_per_minute: int
     debug_verbose: bool
     security_headers: bool
+    impedance_key_enabled: bool  
+    impedance_key_secret: str   
+    impedance_key_ttl: int
 
     @classmethod
     def from_file(cls, path: str) -> Dict[str, Any]:
@@ -48,12 +51,18 @@ class AppConfig:
             env_data["debug_verbose"] = os.getenv("DEBUG_VERBOSE", "").lower() == "true"
         if os.getenv("SECURITY_HEADERS"):
             env_data["security_headers"] = os.getenv("SECURITY_HEADERS", "").lower() == "true"
+        if os.getenv("IMPEDANCE_KEY_ENABLED"):
+            env_data["impedance_key_enabled"] = os.getenv("IMPEDANCE_KEY_ENABLED", "").lower() == "true"
+        if os.getenv("IMPEDANCE_KEY_SECRET"):
+            env_data["impedance_key_secret"] = os.getenv("IMPEDANCE_KEY_SECRET")
+        if os.getenv("IMPEDANCE_KEY_TTL"):
+            env_data["impedance_key_ttl"] = int(os.getenv("IMPEDANCE_KEY_TTL"))
+
         
         return env_data
 
     @classmethod
     def from_cli(cls) -> Dict[str, Any]:
-        # Фильтруем только аргументы, которые относятся к нашему приложению
         cli_args = [arg for arg in sys.argv[1:] if arg.startswith('--') and not arg in ['--reload', '--host', '--port']]
         
         parser = ArgumentParser(add_help=False)
@@ -67,6 +76,12 @@ class AppConfig:
         parser.add_argument("--no-security-headers", dest="security_headers", action="store_false")
         parser.set_defaults(debug_verbose=None, security_headers=None)
         
+        parser.add_argument("--impedance-key-enabled", action="store_true")
+        parser.add_argument("--no-impedance-key-enabled", dest="impedance_key_enabled", action="store_false")
+        parser.add_argument("--impedance-key-secret", type=str)
+        parser.add_argument("--impedance-key-ttl", type=int)
+        parser.set_defaults(impedance_key_enabled=None)
+
         try:
             args, _ = parser.parse_known_args(cli_args)
         except:
@@ -90,7 +105,6 @@ class AppConfig:
 
     @classmethod
     def load(cls, config_file: str = "config.yaml") -> "AppConfig":
-        # Приоритет: CLI > ENV > FILE (но CLI только наши параметры)
         final = {}
         
         # Файл (низший приоритет)
@@ -115,6 +129,11 @@ class AppConfig:
         final.setdefault("debug_verbose", final["mode"] == "educational")
         final.setdefault("security_headers", True)
         
+        final.setdefault("impedance_key_enabled", final["mode"] == "production")    
+        final.setdefault("impedance_key_secret", "default-secret-key-change-me")
+        final.setdefault("impedance_key_ttl", 300)  # 5 минут
+
+        
         # Валидация
         errors = []
         if final["mode"] not in ["educational", "production"]:
@@ -132,10 +151,10 @@ class AppConfig:
             errors.append("rate_limit_create_per_minute must be >=1")
         
         if errors:
-            print("❌ Configuration errors:")
+            print(" Configuration errors:")
             for e in errors:
                 print(f"  - {e}")
             sys.exit(1)
         
-        print(f"✅ Configuration loaded: mode={final['mode']}, port={final['port']}, verbose={final['debug_verbose']}")
+        print(f"Configuration loaded: mode={final['mode']}, port={final['port']}, verbose={final['debug_verbose']}")
         return cls(**final)

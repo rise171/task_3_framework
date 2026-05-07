@@ -8,3 +8,6 @@ rate_limit_per_minute: 60
 rate_limit_create_per_minute: 10
 debug_verbose: true
 security_headers: true
+impedance_key_enabled: true
+impedance_key_secret: "your-super-secret-key-here"
+impedance_key_ttl: 300
